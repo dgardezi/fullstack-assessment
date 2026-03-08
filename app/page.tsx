@@ -46,15 +46,23 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => setCategories(data.categories));
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load categories");
+        return res.json();
+      })
+      .then((data) => setCategories(data.categories ?? []))
+      .catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
     if (selectedCategory) {
-      fetch(`/api/subcategories`)
-        .then((res) => res.json())
-        .then((data) => setSubCategories(data.subCategories));
+      fetch(`/api/subcategories?category=${encodeURIComponent(selectedCategory)}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to load subcategories");
+          return res.json();
+        })
+        .then((data) => setSubCategories(data.subCategories ?? []))
+        .catch(() => setSubCategories([]));
     } else {
       setSubCategories([]);
       setSelectedSubCategory(undefined);
@@ -70,9 +78,16 @@ export default function Home() {
     params.append("limit", "20");
 
     fetch(`/api/products?${params}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load products");
+        return res.json();
+      })
       .then((data) => {
-        setProducts(data.products);
+        setProducts(data.products ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setProducts([]);
         setLoading(false);
       });
   }, [search, selectedCategory, selectedSubCategory]);
@@ -95,6 +110,7 @@ export default function Home() {
             </div>
 
             <Select
+              key={`category-${selectedCategory ?? "none"}`}
               value={selectedCategory}
               onValueChange={(value) => setSelectedCategory(value || undefined)}
             >
@@ -112,6 +128,7 @@ export default function Home() {
 
             {selectedCategory && subCategories.length > 0 && (
               <Select
+                key={`subcategory-${selectedSubCategory ?? "none"}`}
                 value={selectedSubCategory}
                 onValueChange={(value) =>
                   setSelectedSubCategory(value || undefined)
@@ -158,16 +175,13 @@ export default function Home() {
         ) : (
           <>
             <p className="text-sm text-muted-foreground mb-4">
-              Showing {products.length} products
+              Showing {products.length} {products.length === 1 ? "product" : "products"}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
                 <Link
                   key={product.stacklineSku}
-                  href={{
-                    pathname: "/product",
-                    query: { product: JSON.stringify(product) },
-                  }}
+                  href={`/product/${encodeURIComponent(product.stacklineSku)}`}
                 >
                   <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
                     <CardHeader className="p-0">
@@ -183,7 +197,7 @@ export default function Home() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="flex-1 min-h-0 pt-4">
                       <CardTitle className="text-base line-clamp-2 mb-2">
                         {product.title}
                       </CardTitle>
